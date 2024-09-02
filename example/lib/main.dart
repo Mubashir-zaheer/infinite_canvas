@@ -1,3 +1,4 @@
+import 'package:example/widgets.dart';
 import 'package:flutter/material.dart';
 
 import 'generated_nodes.dart';

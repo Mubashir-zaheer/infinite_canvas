@@ -451,3 +451,95 @@ class InfiniteCanvasController extends ChangeNotifier implements Graph {
     notifyListeners();
   }
 }
+
+
+
+
+//
+// MenuEntry(
+// label: 'Free Sketch',
+// onPressed: () {
+// final color = RandomColor().randomColor();
+// final node = SketchNode(
+// color: color,
+// size: const Size(300, 300),
+// );
+// controller!.add(node);
+// },
+// ),
+
+
+// Sketch Node to maintain the sketch state
+// class SketchNode extends InfiniteCanvasNode {
+//   final Color color;
+//
+//   SketchNode({
+//     required this.color,
+//     required Size size,
+//   }) : super(
+//     key: UniqueKey(),
+//     resizeMode: ResizeMode.edges,
+//     size: size,
+//     offset: Offset.zero,
+//     child: FreeSketchWidget(color: color),
+//   );
+// }
+//
+// class FreeSketchWidget extends StatefulWidget {
+//   final Color color;
+//
+//   const FreeSketchWidget({
+//     required this.color,
+//     Key? key,
+//   }) : super(key: key);
+//
+//   @override
+//   State<FreeSketchWidget> createState() => _FreeSketchWidgetState();
+// }
+//
+// class _FreeSketchWidgetState extends State<FreeSketchWidget> {
+//   List<Offset> points = [];
+//
+//   @override
+//   Widget build(BuildContext context) {
+//     return GestureDetector(
+//       onPanUpdate: (details) {
+//         setState(() {
+//           final RenderBox renderBox = context.findRenderObject() as RenderBox;
+//           final localPosition = renderBox.globalToLocal(details.globalPosition);
+//           points.add(localPosition);
+//         });
+//       },
+//       onPanEnd: (details) => points.add(Offset.zero),
+//       child: CustomPaint(
+//         painter: SketchPainter(points: points),
+//         child: Container(
+//           color: Colors.transparent,
+//         ),
+//       ),
+//     );
+//   }
+// }
+//
+// class SketchPainter extends CustomPainter {
+//   final List<Offset> points;
+//
+//   SketchPainter({required this.points});
+//
+//   @override
+//   void paint(Canvas canvas, Size size) {
+//     final paint = Paint()
+//       ..color = Colors.black
+//       ..strokeCap = StrokeCap.round
+//       ..strokeWidth = 5.0;
+//
+//     for (int i = 0; i < points.length - 1; i++) {
+//       if (points[i] != Offset.zero && points[i + 1] != Offset.zero) {
+//         canvas.drawLine(points[i], points[i + 1], paint);
+//       }
+//     }
+//   }
+//
+//   @override
+//   bool shouldRepaint(covariant CustomPainter oldDelegate) => true;
+// }
