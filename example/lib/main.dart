@@ -1,6 +1,8 @@
+import 'package:example/sketchCanvas/canvas.dart';
 import 'package:example/widgets.dart';
 import 'package:flutter/material.dart';
 
+import 'example.dart';
 import 'generated_nodes.dart';
 
 void main() => runApp(const MyApp());
@@ -12,7 +14,7 @@ class MyApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
-      home: const GeneratedNodes(),
+      home:  DrawShapeScreen(),
       theme: ThemeData.light(useMaterial3: true),
       darkTheme: ThemeData.dark(useMaterial3: true),
       themeMode: ThemeMode.system,
