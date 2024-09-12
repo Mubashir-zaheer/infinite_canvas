@@ -13,16 +13,32 @@ class _DrawShapeScreenState extends State<DrawShapeScreen> {
   Shape? currentShape;
   ShapeType selectedShapeType = ShapeType.line; // Default shape type
   bool isDrawingLine = false;
+
+
+  bool isPickingPoints = false;
+  Offset? pointA;
+  Offset? pointB;
+  String? measurement;
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(title: const Text('Draw Shapes and Freehand with Grid')),
       body: GestureDetector(
         onTapUp: (details) {
-          if (isDrawingLine) {
+          if (selectedShapeType == ShapeType.measurementLine) {
+            if (pointA == null) {
+              pointA = details.localPosition;
+              isPickingPoints = true;
+            } else if (pointB == null) {
+              pointB = details.localPosition;
+              isPickingPoints = false;
+              // Open dialog for inputting the distance
+              _showMeasurementDialog();
+            }
+          } else if (isDrawingLine) {
             setState(() {
               Offset tapPosition = details.localPosition;
-
               // If the first point is close to the tap, close the shape
               if (currentFreehandShape.isNotEmpty &&
                   (tapPosition - currentFreehandShape.first).distance < 20.0) {
@@ -131,13 +147,53 @@ class _DrawShapeScreenState extends State<DrawShapeScreen> {
         return Icons.create; // Freehand line
       case ShapeType.path:
         return Icons.timeline; // New icon for "Path"
+      case ShapeType.measurementLine:
+        return Icons.straighten; // New icon for "Measurement Line"
       default:
         return Icons.help;
     }
   }
+
+  void _showMeasurementDialog() async {
+    String? result = await showDialog<String>(
+      context: context,
+      builder: (context) {
+        String input = '';
+        return AlertDialog(
+          title: Text('Enter Distance'),
+          content: TextField(
+            onChanged: (value) {
+              input = value;
+            },
+            keyboardType: TextInputType.number,
+            decoration: InputDecoration(hintText: "Enter distance in meters"),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () {
+                Navigator.of(context).pop(input);
+              },
+              child: Text('OK'),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (result != null) {
+      setState(() {
+        measurement = result;
+        // Save the shape (line with distance)
+        shapes.add(MeasurementLine(pointA!, pointB!, measurement!));
+        pointA = null;
+        pointB = null;
+      });
+    }
+  }
+
 }
 
-enum ShapeType { rectangle, circle, arrow, line, path }
+enum ShapeType { rectangle, circle, arrow, line, path , measurementLine}
 
 abstract class Shape {
   Offset start;
@@ -189,9 +245,9 @@ class ArrowShape extends Shape {
 
     canvas.drawLine(start, currentPoint, arrowPaint);
 
-    final arrowHeadSize = 10.0;
+    const arrowHeadSize = 10.0;
     final direction = (currentPoint - start).direction;
-    final arrowHeadAngle = 0.5;
+    const arrowHeadAngle = 0.5;
 
     final arrowHeadPoint1 = currentPoint - Offset.fromDirection(direction - arrowHeadAngle, arrowHeadSize);
     final arrowHeadPoint2 = currentPoint - Offset.fromDirection(direction + arrowHeadAngle, arrowHeadSize);
@@ -286,8 +342,60 @@ class GridPainter extends CustomPainter {
       canvas.drawCircle(currentFreehandShape.first, 6.0, pointPaint);
     }
 
+
   }
+
+
 
   @override
   bool shouldRepaint(covariant CustomPainter oldDelegate) => true;
 }
+
+
+class MeasurementLine extends Shape {
+  final Offset end;
+  final String distance;
+
+  MeasurementLine(Offset start, this.end, this.distance) : super(start);
+
+  @override
+  void draw(Canvas canvas, Paint paint) {
+    // Draw the line
+    canvas.drawLine(start, end, paint);
+    _drawEndMarkers(canvas, start, end, paint);
+    // Draw the measurement text
+    TextPainter textPainter = TextPainter(
+      text: TextSpan(text: distance, style: const TextStyle(color: Colors.black, fontSize: 16)),
+      textDirection: TextDirection.ltr,
+    );
+    textPainter.layout();
+    // Calculate the mid-point of the line to position the text
+    Offset midPoint = Offset((start.dx + end.dx) / 2, (start.dy + end.dy) / 2);
+    textPainter.paint(canvas, midPoint);
+  }
+
+  void _drawEndMarkers(Canvas canvas, Offset start, Offset end, Paint paint) {
+    // Calculate the direction vector of the line
+    final direction = (end - start).direction;
+
+    // Calculate the perpendicular direction (90 degrees)
+    final perpendicularDirection = direction + 1.5708; // 1.5708 radians = 90 degrees
+
+    // Define the size of the end markers
+    const markerLength = 10.0;
+
+    // Draw marker at start
+    final startMarker1 = start + Offset.fromDirection(perpendicularDirection, markerLength);
+    final startMarker2 = start - Offset.fromDirection(perpendicularDirection, markerLength);
+    canvas.drawLine(startMarker1, startMarker2, paint);
+
+    // Draw marker at end
+    final endMarker1 = end + Offset.fromDirection(perpendicularDirection, markerLength);
+    final endMarker2 = end - Offset.fromDirection(perpendicularDirection, markerLength);
+    canvas.drawLine(endMarker1, endMarker2, paint);
+  }
+}
+
+
+
+
