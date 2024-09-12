@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-
+import 'dart:math' as math; // Import the math library
 class DrawShapeScreen extends StatefulWidget {
   @override
   _DrawShapeScreenState createState() => _DrawShapeScreenState();
@@ -13,12 +13,60 @@ class _DrawShapeScreenState extends State<DrawShapeScreen> {
   Shape? currentShape;
   ShapeType selectedShapeType = ShapeType.line; // Default shape type
   bool isDrawingLine = false;
+  Offset? lastTap; // Store the last tap position to draw a dot
+
+  double gridSize = 20.0; // Size of the grid
+  // Method to snap the tap/drag position to the nearest grid intersection
+  Offset _getSnappedPosition(Offset position) {
+    double snappedX = (position.dx / gridSize).round() * gridSize;
+    double snappedY = (position.dy / gridSize).round() * gridSize;
+    return Offset(snappedX, snappedY);
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(title: const Text('Draw Shapes and Freehand with Grid')),
       body: GestureDetector(
         onTapUp: (details) {
+          if (selectedShapeType != ShapeType.path) {
+            switch (selectedShapeType) {
+              case ShapeType.autoSquare:
+                setState(() {
+                  Offset tappedPoint = _getSnappedPosition(details.localPosition);
+
+                  // If there's no shape, start a new one
+                  if (currentShape == null) {
+                    currentShape = LinearLinePainter(tappedPoint);
+                    lastTap = tappedPoint; // Store the first tap point
+                  }
+                  // If the shape is a LinearLinePainter and it's not closed yet
+                  else if (currentShape is LinearLinePainter) {
+                    LinearLinePainter linePainter = currentShape as LinearLinePainter;
+
+                    // Check if the tapped point is near the first point (within a certain distance, e.g. 20 pixels)
+                    if (linePainter.points.isNotEmpty &&
+                        (tappedPoint - linePainter.points.first).distance < 20.0) {
+
+                      // Close the shape by adding the first point as the last point
+                      linePainter.addPoint(linePainter.points.first);
+
+                      // Save the closed shape and reset to start a new one
+                      shapes.add(linePainter);
+                      currentShape = null;  // Set to null so a new shape can start on the next tap
+                      lastTap = null; // Remove the last tap since the shape is complete
+                    } else {
+                      // Add the tapped point to the current shape
+                      linePainter.addPoint(tappedPoint);
+                      lastTap = tappedPoint; // Update last tap point for the next line
+                    }
+                  }
+                });
+                break;
+              default:
+                break;
+            }
+          }
           if (isDrawingLine) {
             setState(() {
               Offset tapPosition = details.localPosition;
@@ -26,18 +74,22 @@ class _DrawShapeScreenState extends State<DrawShapeScreen> {
               // If the first point is close to the tap, close the shape
               if (currentFreehandShape.isNotEmpty &&
                   (tapPosition - currentFreehandShape.first).distance < 20.0) {
-                currentFreehandShape.add(currentFreehandShape.first); // Close the loop
+                currentFreehandShape
+                    .add(currentFreehandShape.first); // Close the loop
                 freehandShapes.add(currentFreehandShape);
                 currentFreehandShape = []; // Start a new shape
               } else {
                 currentFreehandShape.add(tapPosition);
               }
             });
+
+
           }
         },
         onPanUpdate: (details) {
           setState(() {
-            if (selectedShapeType == ShapeType.path || selectedShapeType == ShapeType.line) {
+            if (selectedShapeType == ShapeType.path ||
+                selectedShapeType == ShapeType.line) {
               if (currentFreehandShape.isEmpty) {
                 currentFreehandShape.add(details.localPosition);
               } else {
@@ -50,7 +102,8 @@ class _DrawShapeScreenState extends State<DrawShapeScreen> {
         },
         onPanEnd: (details) {
           setState(() {
-            if (selectedShapeType == ShapeType.path || selectedShapeType == ShapeType.line) {
+            if (selectedShapeType == ShapeType.path ||
+                selectedShapeType == ShapeType.line) {
               if (currentFreehandShape.isNotEmpty) {
                 freehandShapes.add(currentFreehandShape);
                 currentFreehandShape = [];
@@ -75,6 +128,7 @@ class _DrawShapeScreenState extends State<DrawShapeScreen> {
                 case ShapeType.arrow:
                   currentShape = ArrowShape(details.localPosition);
                   break;
+
                 default:
                   break;
               }
@@ -82,7 +136,8 @@ class _DrawShapeScreenState extends State<DrawShapeScreen> {
           });
         },
         child: CustomPaint(
-          painter: GridPainter(shapes, freehandShapes, currentShape, currentFreehandShape),
+          painter: GridPainter(
+              shapes, freehandShapes, currentShape, currentFreehandShape,gridSize,lastTap,),
           child: Container(),
         ),
       ),
@@ -106,8 +161,9 @@ class _DrawShapeScreenState extends State<DrawShapeScreen> {
               onPressed: () {
                 setState(() {
                   selectedShapeType = shapeType;
-                  if(ShapeType.path == shapeType){
-                    print("path");
+                  print("shapeType: $shapeType");
+                  if (ShapeType.path == shapeType) {
+                    print("shapeType");
                     isDrawingLine = true;
                   }
                 });
@@ -131,13 +187,15 @@ class _DrawShapeScreenState extends State<DrawShapeScreen> {
         return Icons.create; // Freehand line
       case ShapeType.path:
         return Icons.timeline; // New icon for "Path"
+      case ShapeType.autoSquare:
+        return Icons.crop_7_5;
       default:
         return Icons.help;
     }
   }
 }
 
-enum ShapeType { rectangle, circle, arrow, line, path }
+enum ShapeType { rectangle, circle, arrow, line, path, autoSquare }
 
 abstract class Shape {
   Offset start;
@@ -189,25 +247,122 @@ class ArrowShape extends Shape {
 
     canvas.drawLine(start, currentPoint, arrowPaint);
 
-    final arrowHeadSize = 10.0;
+    const arrowHeadSize = 10.0;
     final direction = (currentPoint - start).direction;
-    final arrowHeadAngle = 0.5;
+    const arrowHeadAngle = 0.5;
 
-    final arrowHeadPoint1 = currentPoint - Offset.fromDirection(direction - arrowHeadAngle, arrowHeadSize);
-    final arrowHeadPoint2 = currentPoint - Offset.fromDirection(direction + arrowHeadAngle, arrowHeadSize);
+    final arrowHeadPoint1 = currentPoint -
+        Offset.fromDirection(direction - arrowHeadAngle, arrowHeadSize);
+    final arrowHeadPoint2 = currentPoint -
+        Offset.fromDirection(direction + arrowHeadAngle, arrowHeadSize);
 
     canvas.drawLine(currentPoint, arrowHeadPoint1, arrowPaint);
     canvas.drawLine(currentPoint, arrowHeadPoint2, arrowPaint);
   }
 }
 
+class LinearLinePainter extends Shape {
+  List<Offset> points = [];
+  bool isClosed = false; // Indicates if the shape is closed
+
+  LinearLinePainter(Offset start) : super(start) {
+    points.add(start); // Initialize with the first point
+  }
+
+  // Add a new point to the list of points
+  void addPoint(Offset point) {
+    if (points.isNotEmpty && (point - points.first).distance < 20.0) {
+      // Close the shape if the new point is near the first point
+      points.add(points.first); // Close the shape by connecting to the first point
+      isClosed = true;          // Mark the shape as closed
+    } else {
+      points.add(point); // Add the new point to the shape
+    }
+  }
+
+  @override
+  void draw(Canvas canvas, Paint paint) {
+    final linePaint = Paint()
+      ..color = Colors.red
+      ..strokeWidth = 4.0
+      ..style = PaintingStyle.stroke
+      ..strokeCap = StrokeCap.round;
+
+    // Draw the original shape
+    for (int i = 0; i < points.length - 1; i++) {
+      canvas.drawLine(points[i], points[i + 1], linePaint);
+    }
+
+    // If the shape is closed, draw the doubled version
+    if (isClosed) {
+      _drawDoubledShape(canvas, linePaint);
+    }
+  }
+
+  // Method to draw the doubled shape
+  void _drawDoubledShape(Canvas canvas, Paint paint) {
+    if (points.length < 2) return;
+
+    // Calculate the bounding box of the original shape
+    double minX = points[0].dx;
+    double minY = points[0].dy;
+    double maxX = points[0].dx;
+    double maxY = points[0].dy;
+
+    for (var point in points) {
+      if (point.dx < minX) minX = point.dx;
+      if (point.dy < minY) minY = point.dy;
+      if (point.dx > maxX) maxX = point.dx;
+      if (point.dy > maxY) maxY = point.dy;
+    }
+
+    // Calculate the width, height, and center of the original bounding box
+    double width = maxX - minX;
+    double height = maxY - minY;
+    double centerX = (minX + maxX) / 2;
+    double centerY = (minY + maxY) / 2;
+
+    // Calculate the new bounding box for the doubled shape (centered on the same point)
+    double newMinX = centerX - width;
+    double newMinY = centerY - height;
+    double newMaxX = centerX + width;
+    double newMaxY = centerY + height;
+
+    // Scale the points so they fit within the new bounding box
+    List<Offset> scaledPoints = points.map((point) {
+      double scaledX = newMinX + (point.dx - minX) * 2;
+      double scaledY = newMinY + (point.dy - minY) * 2;
+      return Offset(scaledX, scaledY);
+    }).toList();
+
+    // Draw the scaled shape (the outer, doubled shape)
+    for (int i = 0; i < scaledPoints.length - 1; i++) {
+      canvas.drawLine(scaledPoints[i], scaledPoints[i + 1], paint);
+    }
+  }
+
+  @override
+  void update(Offset position) {
+    currentPoint = position;
+    points.add(currentPoint); // Add the point while drawing
+  }
+}
+
+
+
+
+
+
+
 class GridPainter extends CustomPainter {
   final List<Shape> shapes;
   final List<List<Offset>> freehandShapes;
   final Shape? currentShape;
   final List<Offset> currentFreehandShape;
+  final double gridSize;
+  final Offset? lastTap; // Nullable Offset for the temporary dot
 
-  GridPainter(this.shapes, this.freehandShapes, this.currentShape, this.currentFreehandShape);
+  GridPainter(this.shapes, this.freehandShapes, this.currentShape, this.currentFreehandShape, this.gridSize, this.lastTap);
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -216,7 +371,6 @@ class GridPainter extends CustomPainter {
       ..strokeWidth = 1.0;
 
     // Draw grid
-    double gridSize = 20.0;
     for (double x = 0; x < size.width; x += gridSize) {
       canvas.drawLine(Offset(x, 0), Offset(x, size.height), gridPaint);
     }
@@ -234,60 +388,23 @@ class GridPainter extends CustomPainter {
       shape.draw(canvas, shapePaint);
     }
 
-    // Draw all freehand shapes
-    for (var shape in freehandShapes) {
-      for (int i = 0; i < shape.length - 1; i++) {
-        canvas.drawLine(shape[i], shape[i + 1], shapePaint);
-      }
-    }
-
     // Draw the current shape being drawn
     if (currentShape != null) {
-      shapePaint.color = Colors.blue; // Highlight color
       currentShape!.draw(canvas, shapePaint);
     }
 
-    // Draw the current freehand shape being drawn
-    if (currentFreehandShape.isNotEmpty) {
-      for (int i = 0; i < currentFreehandShape.length - 1; i++) {
-        canvas.drawLine(currentFreehandShape[i], currentFreehandShape[i + 1], shapePaint);
-      }
+    // Ensure lastTap is not null before drawing the dot
+    if (lastTap != null) {
+      var dotPaint = Paint()
+        ..color = Colors.blue
+        ..style = PaintingStyle.fill;
+
+      // Use lastTap as the center and 5.0 as the radius
+      canvas.drawCircle(lastTap!, 5.0, dotPaint); // Ensure the radius is a double (5.0)
     }
-
-    // Draw the first point of the current shape if it exists
-    if (currentShape != null && currentShape!.start != currentShape!.currentPoint) {
-      canvas.drawCircle(currentShape!.start, 6.0, shapePaint..color = Colors.red);
-    }
-
-
-    var paint = Paint()
-      ..color = Colors.black
-      ..strokeWidth = 4.0
-      ..strokeCap = StrokeCap.round;
-
-    var pointPaint = Paint()
-      ..color = Colors.red
-      ..style = PaintingStyle.fill;
-
-
-    for (var shape in freehandShapes) {
-      for (int i = 0; i < shape.length - 1; i++) {
-        canvas.drawLine(shape[i], shape[i + 1], paint);
-      }
-    }
-
-    // Draw the current shape being drawn
-    for (int i = 0; i < currentFreehandShape.length - 1; i++) {
-      canvas.drawLine(currentFreehandShape[i], currentFreehandShape[i + 1], paint);
-    }
-
-    // Draw the first point of the current shape if it exists
-    if (currentFreehandShape.isNotEmpty) {
-      canvas.drawCircle(currentFreehandShape.first, 6.0, pointPaint);
-    }
-
   }
 
   @override
   bool shouldRepaint(covariant CustomPainter oldDelegate) => true;
 }
+
