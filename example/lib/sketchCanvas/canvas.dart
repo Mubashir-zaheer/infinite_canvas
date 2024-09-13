@@ -261,9 +261,12 @@ class ArrowShape extends Shape {
   }
 }
 
+
+
 class LinearLinePainter extends Shape {
   List<Offset> points = [];
   bool isClosed = false; // Indicates if the shape is closed
+  final double distanceFromInnerShape = 40.0; // Distance between the inner and outer shapes
 
   LinearLinePainter(Offset start) : super(start) {
     points.add(start); // Initialize with the first point
@@ -293,17 +296,18 @@ class LinearLinePainter extends Shape {
       canvas.drawLine(points[i], points[i + 1], linePaint);
     }
 
-    // If the shape is closed, draw the doubled version
+    // If the shape is closed, draw the outer version and connect the corners
     if (isClosed) {
-      _drawDoubledShape(canvas, linePaint);
+      _drawOuterShape(canvas, linePaint);
+      _connectCorners(canvas, linePaint);
     }
   }
 
-  // Method to draw the doubled shape
-  void _drawDoubledShape(Canvas canvas, Paint paint) {
+  // Method to draw the outer shape by scaling the points based on bounding box
+  void _drawOuterShape(Canvas canvas, Paint paint) {
     if (points.length < 2) return;
 
-    // Calculate the bounding box of the original shape
+    // Calculate the bounding box for the shape
     double minX = points[0].dx;
     double minY = points[0].dy;
     double maxX = points[0].dx;
@@ -316,28 +320,70 @@ class LinearLinePainter extends Shape {
       if (point.dy > maxY) maxY = point.dy;
     }
 
-    // Calculate the width, height, and center of the original bounding box
+    // Calculate the center of the bounding box (centroid)
+    Offset centroid = Offset((minX + maxX) / 2, (minY + maxY) / 2);
+
+    // Calculate the outward movement for the outer shape based on the bounding box
     double width = maxX - minX;
     double height = maxY - minY;
-    double centerX = (minX + maxX) / 2;
-    double centerY = (minY + maxY) / 2;
+    double scaleFactor = (distanceFromInnerShape / math.min(width, height)) + 1;
 
-    // Calculate the new bounding box for the doubled shape (centered on the same point)
-    double newMinX = centerX - width;
-    double newMinY = centerY - height;
-    double newMaxX = centerX + width;
-    double newMaxY = centerY + height;
+    // Move each point outward proportionally based on the bounding box
+    List<Offset> outerPoints = points.map((point) {
+      double deltaX = point.dx - centroid.dx;
+      double deltaY = point.dy - centroid.dy;
 
-    // Scale the points so they fit within the new bounding box
-    List<Offset> scaledPoints = points.map((point) {
-      double scaledX = newMinX + (point.dx - minX) * 2;
-      double scaledY = newMinY + (point.dy - minY) * 2;
-      return Offset(scaledX, scaledY);
+      return Offset(
+        centroid.dx + deltaX * scaleFactor,
+        centroid.dy + deltaY * scaleFactor,
+      );
     }).toList();
 
-    // Draw the scaled shape (the outer, doubled shape)
-    for (int i = 0; i < scaledPoints.length - 1; i++) {
-      canvas.drawLine(scaledPoints[i], scaledPoints[i + 1], paint);
+    // Draw the outer shape by connecting the scaled points
+    for (int i = 0; i < outerPoints.length - 1; i++) {
+      canvas.drawLine(outerPoints[i], outerPoints[i + 1], paint);
+    }
+    // Close the shape
+    canvas.drawLine(outerPoints.last, outerPoints.first, paint);
+  }
+
+  // Method to connect corresponding corners of the inner and outer shapes
+  void _connectCorners(Canvas canvas, Paint paint) {
+    if (points.length < 2) return;
+
+    // Calculate the bounding box for the shape
+    double minX = points[0].dx;
+    double minY = points[0].dy;
+    double maxX = points[0].dx;
+    double maxY = points[0].dy;
+
+    for (var point in points) {
+      if (point.dx < minX) minX = point.dx;
+      if (point.dy < minY) minY = point.dy;
+      if (point.dx > maxX) maxX = point.dx;
+      if (point.dy > maxY) maxY = point.dy;
+    }
+
+    // Calculate the center of the bounding box (centroid)
+    Offset centroid = Offset((minX + maxX) / 2, (minY + maxY) / 2);
+
+    double width = maxX - minX;
+    double height = maxY - minY;
+    double scaleFactor = (distanceFromInnerShape / math.min(width, height)) + 1;
+
+    List<Offset> outerPoints = points.map((point) {
+      double deltaX = point.dx - centroid.dx;
+      double deltaY = point.dy - centroid.dy;
+
+      return Offset(
+        centroid.dx + deltaX * scaleFactor,
+        centroid.dy + deltaY * scaleFactor,
+      );
+    }).toList();
+
+    // Connect corresponding corners between inner and outer shapes
+    for (int i = 0; i < points.length - 1; i++) {
+      canvas.drawLine(points[i], outerPoints[i], paint);
     }
   }
 
