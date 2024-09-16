@@ -25,8 +25,23 @@ class _DrawShapeScreenState extends State<DrawShapeScreen> {
     return Scaffold(
       appBar: AppBar(title: const Text('Draw Shapes and Freehand with Grid')),
       body: GestureDetector(
-        onTapUp: (details) {
-          if (selectedShapeType == ShapeType.measurementLine) {
+        onTapUp: (details)async {
+          if (selectedShapeType == ShapeType.text) {
+            // setState(() async{
+              // Show dialog to get user input text
+              String? userText = await getUserInputText(context);
+              if (userText != null && userText.isNotEmpty) {
+                // Create a TextShape with user input
+                currentShape = TextShape(details.localPosition, userText);
+                shapes.add(currentShape!);
+                currentShape = null;
+              }
+              setState(() {
+
+              });
+            // });
+
+          } else if (selectedShapeType == ShapeType.measurementLine) {
             if (pointA == null) {
               pointA = details.localPosition;
               isPickingPoints = true;
@@ -149,6 +164,8 @@ class _DrawShapeScreenState extends State<DrawShapeScreen> {
         return Icons.timeline; // New icon for "Path"
       case ShapeType.measurementLine:
         return Icons.straighten; // New icon for "Measurement Line"
+      case ShapeType.text:
+        return Icons.text_fields; // New icon for "Measurement Line"
       default:
         return Icons.help;
     }
@@ -166,7 +183,7 @@ class _DrawShapeScreenState extends State<DrawShapeScreen> {
               input = value;
             },
             keyboardType: TextInputType.number,
-            decoration: InputDecoration(hintText: "Enter distance in meters"),
+            decoration: const InputDecoration(hintText: "Enter distance in meters"),
           ),
           actions: [
             TextButton(
@@ -190,10 +207,35 @@ class _DrawShapeScreenState extends State<DrawShapeScreen> {
       });
     }
   }
+  Future<String?> getUserInputText(BuildContext context) async {
+    String userInput = '';
+    return showDialog<String>(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: const Text('Add Text'),
+          content: TextField(
+            onChanged: (value) {
+              userInput = value;
+            },
+            decoration: const InputDecoration(),
+          ),
+          actions: <Widget>[
+            TextButton(
+              onPressed: () {
+                Navigator.of(context).pop(userInput);
+              },
+              child: const Text('OK'),
+            ),
+          ],
+        );
+      },
+    );
+  }
 
 }
 
-enum ShapeType { rectangle, circle, arrow, line, path , measurementLine}
+enum ShapeType { rectangle, circle, arrow, line, path , measurementLine, text}
 
 abstract class Shape {
   Offset start;
@@ -351,7 +393,6 @@ class GridPainter extends CustomPainter {
   bool shouldRepaint(covariant CustomPainter oldDelegate) => true;
 }
 
-
 class MeasurementLine extends Shape {
   final Offset end;
   final String distance;
@@ -395,6 +436,23 @@ class MeasurementLine extends Shape {
     canvas.drawLine(endMarker1, endMarker2, paint);
   }
 }
+
+class TextShape extends Shape {
+  final String text;
+
+  TextShape(Offset start, this.text) : super(start);
+
+  @override
+  void draw(Canvas canvas, Paint paint) {
+    TextPainter textPainter = TextPainter(
+      text: TextSpan(text: text, style: const TextStyle(color: Colors.black, fontSize: 24)),
+      textDirection: TextDirection.ltr,
+    );
+    textPainter.layout();
+    textPainter.paint(canvas, start);
+  }
+}
+
 
 
 
