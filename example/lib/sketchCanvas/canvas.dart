@@ -14,6 +14,8 @@ class _DrawShapeScreenState extends State<DrawShapeScreen> {
   ShapeType selectedShapeType = ShapeType.line; // Default shape type
   bool isDrawingLine = false;
 
+List<Shape> redoList = [];
+
 
   bool isPickingPoints = false;
   Offset? pointA;
@@ -23,7 +25,29 @@ class _DrawShapeScreenState extends State<DrawShapeScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Draw Shapes and Freehand with Grid')),
+      appBar: AppBar(title: const Text('Sketch Canvas'),
+
+      actions: [
+        IconButton(
+          icon: Icon(Icons.undo),
+          onPressed: () {
+            // Undo the last action
+            setState(() {
+              if (shapes.isNotEmpty) {
+                redoList.add(shapes.removeLast());
+              }
+            });
+          },
+        ),
+      ],
+        centerTitle: true,
+        leading: IconButton(
+          icon: const Icon(Icons.redo),
+          onPressed: () {
+            shapes.add(redoList.removeLast());
+          },
+      ),
+      ),
       body: GestureDetector(
         onTapUp: (details)async {
           if (selectedShapeType == ShapeType.text) {
@@ -120,13 +144,14 @@ class _DrawShapeScreenState extends State<DrawShapeScreen> {
       floatingActionButton: FloatingActionButton(
         onPressed: () {
           setState(() {
+            redoList.clear();
             shapes.clear();
             freehandShapes.clear();
             currentShape = null;
             currentFreehandShape.clear();
           });
         },
-        child: Icon(Icons.refresh),
+        child: const Icon(Icons.refresh),
       ),
       bottomNavigationBar: BottomAppBar(
         child: Row(
@@ -397,7 +422,7 @@ class MeasurementLine extends Shape {
   final Offset end;
   final String distance;
 
-  MeasurementLine(Offset start, this.end, this.distance) : super(start);
+  MeasurementLine  (Offset start, this.end, this.distance) : super(start);
 
   @override
   void draw(Canvas canvas, Paint paint) {
